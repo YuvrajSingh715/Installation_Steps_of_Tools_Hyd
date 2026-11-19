@@ -1,0 +1,104 @@
+#create amazonlinux ec2 with t2.micro and 30 gb of ebs with port 8081
+---------------------------------------------------------------------
+sudo yum update -y
+sudo yum install wget -y
+sudo yum install java-17-amazon-corretto-headless -y
+sudo mkdir /app && cd /app
+sudo wget -O nexus.tar.gz https://download.sonatype.com/nexus/3/latest-unix.tar.gz
+sudo tar -xvf nexus.tar.gz
+sudo mv nexus-3* nexus
+sudo adduser nexus
+sudo chown -R nexus:nexus /app/nexus
+sudo chown -R nexus:nexus /app/sonatype-work
+sudo echo "run_as_user="nexus"" > /app/nexus/bin/nexus.rc
+
+sudo tee /etc/systemd/system/nexus.service > /dev/null << EOL
+[Unit]
+Description=nexus service
+After=network.target
+
+[Service]
+Type=forking
+LimitNOFILE=65536
+User=nexus
+Group=nexus
+ExecStart=/app/nexus/bin/nexus start
+ExecStop=/app/nexus/bin/nexus stop
+User=nexus
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+run these command separately
+----------------------------
+sudo chkconfig nexus on
+sudo systemctl start nexus
+sudo systemctl status nexus
+
+==================================================================
+
+Architecture
+
+GitHub --> Jenkins (Jenkins delivery artifacts war) --> this war file now pushed to Nexus
+
+Open --> http://ip:8081 --> it takes 13 secs
+
+Click on sign in --> username = admin, password = cat /app/sonatype-work/nexus3/admin.password
+next --> root123456 --> Disable anonymous access
+
+Creating Repo
+=============
+Click on Setting Symbol --> Repositories --> Create repository --> maven2(hosted) --> name(projectname) --> save
+
+Deployment Policy --> Allow redeploy
+
+Integrate Nexus to Jenkins Pipeline
+====================================
+
+Jenkins (Code --> Build --> Test --> Artifact) --> Nexus
+
+If you want to integrate any 3rd party to Jenkins, install plugins
+
+1. Download the Plugins (nexus artifacts uploader)
+   --> Manage Jenkins --> Plugins --> Available Plugins --> Just type only Nexus , it will give nexus artifacts uploader
+2. Configure in Jenkins pipeline in stage
+
+Note: all the information will be available in pom.xml file
+
+Create a new pipeline job --> and copy paste the script and click on pipeline systax
+
+sample step : nexusartifactuploader
+Nexus Version : see nexus version in browser left top 3.0
+Protocol:http
+Nexus URL : IP:8081 (dont put http)
+Credentials : Add --> Jenkins --> username:admin, password: root123, description: nexus
+credentials: select admin
+Groupid: see pom file (in.reyaz)
+version: see pom file (1.2.2)
+Repository: repo that you created in nexus
+Artifact: Add : Artifactid: see pom (myapp) , Type = .war, classifier = empty,  File = target/myapp.war
+ 
+--> generate pipeline script and paste in the below pipeline
+-------------------------------------------------------------------------additional groovy syntax for s3 bucket------------------------------------------------------------------------------
+stage('store artifacts in s3'){
+    steps {
+        s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'jensible-artifact-bkto1', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'ap-south-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: true]], pluginFailureResultConstraint: 'FAILURE', profileName: 's3Creds', userMetadata: []
+    }
+}
+
+======================================
+
+stage('store artifacts in nexus') {
+    steps {
+        nexusArtifactUploader artifacts: [[artifactId: 'myapp', classifier: '', file: 'target/myapp.war', type: '.war']], credentialsId: 'nexus', groupId: 'in.reyaz', nexusUrl: '13.201.53.40:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'myapp', version: '1.2.2'   
+    }
+}
+
+
+And the run the build , once build is success
+
+Refresh Nexus URL --> Go to Repository that created --> Copy the URL ---> Paste in Browser --> HTML Index or Browse
+
+If you rebuild the same build, it will fail because there is a option in nexus repo --> Deployment Policy --> it will be disable redeploy -> change to Allow redeploy
