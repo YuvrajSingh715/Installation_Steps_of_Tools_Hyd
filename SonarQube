@@ -1,0 +1,85 @@
+====== TAKE SonarQube.sh to install ======
+
+SETUP: Launch another EC2 instance - Amazon linux 2023 - t2.medium is must , it will not run on micro
+
+================== script =====================
+#! /bin/bash
+#Launch an instance with 9000 and t2.medium
+cd /opt/
+wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-26.11.0.134175.zip
+unzip sonarqube-26.11.0.134175.zip
+sudo dnf install -y java-21-amazon-corretto-devel
+useradd sonar
+chown sonar:sonar sonarqube-26.11.0.134175 -R
+chmod 777 sonarqube-26.11.0.134175 -R
+su - sonar
+# use the below command manually after installation
+#sh /opt/sonarqube-26.11.0.134175/bin/linux-x86-64/sonar.sh start
+#echo "user=admin & password=admin"
+=================================================
+
+once installed
+manually type below command
+
+sh /opt/sonarqube-26.11.0.134175/bin/linux-x86-64/sonar.sh start
+sh /opt/sonarqube-26.11.0.134175/bin/linux-x86-64/sonar.sh status
+
+==================================================
+
+=================================================================
+If you have stopped the sonar, start the sonar manually
+su - sonar
+sh /opt/sonarqube-26.11.0.134175/bin/linux-x86-64/sonar.sh start
+=================================================================
+
+Open http://IP:9000
+
+username: admin,
+Password : admin
+
+Create a Project --> Create a local project -->
+Project display name: myapp  [according to your pom.xml]
+Project key: in.reyaz:myapp
+Main branch name: master [according to your github repo branch]
+Create Project
+
+Locally --> sqp_d3565c977e67987ee3be2b73d9d55d4fd98b27da
+
+In Jenkins: Add plugin,
+======================
+SonarQube Scanner,
+Maven Integration
+Sonar Scanner Quality Gates
+RESTART JENKINS
+
+
+Go to Credentials
+-----------------
+--> Kind= Secret text , secret = sqp_b704a1cd46f5b7595d703def549e249acf978ae3 (sonar project key)
+id --> sonar , description = sonar
+
+Go to System
+-------------
+--> SonarQube servers --> Enable Environment Variables --> Add SonarQube Server
+     Name = SonarQube
+     URL = http://3.110.190.217:9000
+     Server authentication token = select token - sonar
+
+
+Go to  Tools
+-------------
+--> SonarQube Scanner installations , Name = sonarscanner --> dont click add installer
+
+=======================================================================================
+stage('SonarQubeAnalysis') {
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                mvn org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
+                -Dsonar.projectKey=in.reyaz:myapp \
+                -Dsonar.projectName=myapp
+               '''
+          }
+     }
+}
+      
