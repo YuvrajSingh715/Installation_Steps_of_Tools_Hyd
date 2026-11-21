@@ -1,0 +1,71 @@
+Tomcat Setup 1st Way
+====================
+
+Launch amazon Linux 2023 and install tomcat manually first and then automatically using script
+
+All apache software are available in http://dlcdn.apache.org --> tomcat --> tomcat-11--> v11.0.27--> bin--> apache-tomcat-11.0.27.tar.gz
+
+Step1: install java
+-------------------
+dnf install java-21-amazon-corretto -y
+
+Step 2: download tomcat
+----------------------
+yum install -y wget
+
+wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.27/bin/apache-tomcat-11.0.27.tar.gz
+
+Step3: Extract
+--------------
+tar -zxvf apache-tomcat-11.0.27.tar.gz
+
+Step4: Configure user, passwords and roles
+-------------------------------------------
+ --> cd apache-tomcat-11.0.27/conf/
+ --> vi tomcat-users.xml
+     Add new files --> copy 3 lines and paste, line 56
+     <role rolename="manager-gui"/>
+     <role rolename="manager-script"/>
+     <user username="tomcat" password="raj@123" roles="manager-gui,manager-script"/>
+
+Step 5: Delete line 21 and 22 -- if not delete, we need to give public ip
+------------------------------
+  --> cd apache-tomcat-11.0.27/webapps/manager/META-INF
+  --> vi context.xml
+
+Step 6: Start Tomcat
+--------------------
+  --> cd apache-tomcat-11.0.27/bin
+  --> sh startup.sh
+
+Connection
+==========
+http://IP:8080
+manager apps --> username: tomcat, password: root123
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Tomcat Setup 2nd Way
+====================
+Launch a new Amazon Linux 2023 t3.micro instance
+
+vi tomcat.sh
+---------------------------------------
+dnf install java-21-amazon-corretto -y
+wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.14/bin/apache-tomcat-11.0.14.tar.gz
+tar -zxvf apache-tomcat-11.0.14.tar.gz
+sed -i '56  a\<role rolename="manager-gui"/>' apache-tomcat-11.0.14/conf/tomcat-users.xml
+sed -i '57  a\<role rolename="manager-script"/>' apache-tomcat-11.0.14/conf/tomcat-users.xml
+sed -i '58  a\<user username="tomcat" password="root123456" roles="manager-gui, manager-script"/>' apache-tomcat-11.0.14/conf/tomcat-users.xml
+sed -i '59  a\</tomcat-users>' apache-tomcat-11.0.14/conf/tomcat-users.xml
+sed -i '56d' apache-tomcat-11.0.14/conf/tomcat-users.xml
+sed -i '21d' apache-tomcat-11.0.14/webapps/manager/META-INF/context.xml
+sed -i '22d' apache-tomcat-11.0.14/webapps/manager/META-INF/context.xml
+sh apache-tomcat-11.0.14/bin/startup.sh
+---------------------------------------
+
+To replace the tomcat version in the file automatically
+sed -i 's/11.0.14/11.0.29/g' tomcat.sh
+
+sh tomcat.sh
